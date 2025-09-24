@@ -1,1 +1,51 @@
-
+SELECT
+   l.CODE_LPU as "Код МО",
+   l.FULLNAME as "Наименование МО",
+   COUNT(DISTINCT CASE
+       WHEN mkb.MKB_CODE BETWEEN 'I63' AND 'I63.9'
+       AND EXISTS (
+           SELECT 1 FROM D_DIRECTION_SERVICES ds
+           JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
+           WHERE ds.DISEASECASE = dc.ID
+           AND serv.SE_CODE = 'A25.30.036.002'
+       ) THEN hh.ID
+   END) as "Тромболитич. терапия (I63)",
+   ---
+   COUNT(DISTINCT CASE
+       WHEN mkb.MKB_CODE BETWEEN 'I63' AND 'I63.9'
+       AND EXISTS (
+           SELECT 1 FROM D_DIRECTION_SERVICES ds
+           JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
+           WHERE ds.DISEASECASE = dc.ID
+           AND serv.SE_CODE = 'A16.23.034.013'
+       ) THEN hh.ID
+   END) as "Операция A16.23.034.013 (I63)",
+   ---
+   COUNT(DISTINCT CASE
+       WHEN mkb.MKB_CODE BETWEEN 'I60' AND 'I60.9'
+       AND EXISTS (
+           SELECT 1 FROM D_DIRECTION_SERVICES ds
+           JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
+           WHERE ds.DISEASECASE = dc.ID
+           AND (serv.SE_CODE IN ('A16.12.041.002', 'A16.23.053', 'A16.23.015', 'A16.23.016', 'A16.23.028')
+                OR serv.SE_CODE LIKE 'A16.23.017%')
+       ) THEN hh.ID
+   END) as "САК (I60)",
+   ---
+   COUNT(DISTINCT CASE
+       WHEN mkb.MKB_CODE BETWEEN 'I61' AND 'I61.9'
+       AND EXISTS (
+           SELECT 1 FROM D_DIRECTION_SERVICES ds
+           JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
+           WHERE ds.DISEASECASE = dc.ID
+           AND (serv.SE_CODE IN ('A16.23.053', 'A16.23.015', 'A16.23.016', 'A16.23.028')
+                OR serv.SE_CODE LIKE 'A16.23.017%')
+       ) THEN hh.ID
+   END) as "Кроме САК (I61)"
+FROM D_LPU l
+LEFT JOIN D_HOSP_HISTORIES hh ON hh.LPU = l.ID
+LEFT JOIN D_MKB10 mkb ON mkb.id = hh.MKB_CLINIC
+LEFT JOIN D_DISEASECASES dc ON dc.id = hh.DISEASECASE
+WHERE hh.DATE_OUT BETWEEN to_date(:date1, 'dd.mm.yyyy') AND to_date(:date2, 'dd.mm.yyyy')--заполняйте даты с и по в одинарных кавычках
+GROUP BY l.CODE_LPU, l.FULLNAME
+ORDER BY l.CODE_LPU
