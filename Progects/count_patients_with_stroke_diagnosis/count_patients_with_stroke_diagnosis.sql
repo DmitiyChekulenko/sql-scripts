@@ -1,38 +1,51 @@
 -- =============================================================================
--- НАЗВАНИЕ: Подсчёт историй болезни по диагнозу (I63) и услуге (A25.30.036.002)
--- ОПИСАНИЕ: Считает количество уникальных историй болезни (hh.ID) в разрезе МО,
---           где:
---           - установлен диагноз по МКБ-10 в диапазоне I63–I63.9,
---           - оказана услуга с кодом A25.30.036.002,
---           - дата выписки попадает в заданный интервал.
+-- НАЗВАНИЕ: Подсчёт уникальных пациентов с диагнозом инсульта (I60–I69.8)
+-- ОПИСАНИЕ: Считает количество пациентов, у которых в заданный период
+--           был установлен диагноз из группы "Инсульты" (МКБ-10: I60–I69.8),
+--           независимо от того, был ли диагноз выставлен:
+--           • на амбулаторном приёме (через D_VIS_DIAGNOSISES), ИЛИ
+--           • в стационаре (в истории болезни, D_HOSP_HISTORIES).
+--
+-- ОСОБЕННОСТИ:
+--   • Используется UNION для объединения двух источников диагнозов.
+--   • Гарантировано отсутствие дублирования пациентов (каждый — 1 раз).
+--   • Поддержка параметров date1 и date2 через синтаксис DBeaver '${param}'.
 --
 -- ИСПОЛЬЗОВАНИЕ:
---   1. Откройте скрипт в DBeaver.
---   2. При запуске появятся два параметра: date1 и date2.
---   3. Введите даты в формате: 01.09.2025 (БЕЗ кавычек!).
---      Пример: date1 = 01.09.2025, date2 = 30.09.2025
---   4. Скрипт автоматически обернёт их в кавычки и выполнит запрос.
+--   1. Запустите скрипт в DBeaver.
+--   2. В появившемся окне введите:
+--        date1 = 01.01.2025   (начало периода)
+--        date2 = 31.12.2025   (конец периода)
+--   3. Вводите даты БЕЗ кавычек и в формате DD.MM.YYYY.
 --
--- РЕШЕНИЕ ПРОБЛЕМЫ:
---   Ранее пользователи ошибались, забывая кавычки при вводе дат.
---   Использование синтаксиса '${date1}' в DBeaver позволяет
---   вводить даты как простой текст, а система подставит их как строку.
+-- ВОЗВРАЩАЕТ: 
+--   patient_count — число уникальных пациентов за период.
 --
--- ВАЖНО: Формат даты — строго DD.MM.YYYY
+-- АВТОР: [Дмитрий Чекуленко / DmitiyChekulenko]
+-- ДАТА: 2025-10-01
 -- =============================================================================
 
-SELECT
-    l.CODE_LPU,
-    COUNT(DISTINCT hh.ID) AS hh_count
-FROM D_LPU l
-LEFT JOIN D_HOSP_HISTORIES hh ON hh.LPU = l.ID
-LEFT JOIN D_MKB10 mkb ON mkb.id = hh.MKB_CLINIC
-LEFT JOIN D_DISEASECASES dc ON dc.id = hh.DISEASECASE
-LEFT JOIN D_DIRECTION_SERVICES ds ON ds.DISEASECASE = dc.ID
-LEFT JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
-WHERE 1=1
-  AND mkb.MKB_CODE BETWEEN 'I63' AND 'I63.9'
-  AND serv.SE_CODE = 'A25.30.036.002'
-  AND hh.DATE_OUT BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
-GROUP BY l.CODE_LPU
-ORDER BY l.CODE_LPU;
+SELECT COUNT(DISTINCT t.patient_id) AS patient_count
+FROM (
+   -- 1. Диагнозы, выставленные на приёмах (визитах)
+   SELECT a.id AS patient_id
+   FROM D_VIS_DIAGNOSISES dd
+   JOIN D_MKB10 mkb ON mkb.id = dd.MKB
+   JOIN D_VISITS v ON v.ID = dd.PID
+   JOIN D_DIRECTION_SERVICES ds ON ds.id = v.PID
+   JOIN D_PERSMEDCARD pmc ON pmc.ID = ds.PATIENT
+   JOIN D_AGENTS a ON a.id = pmc.AGENT
+   WHERE v.VISIT_DATE BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
+     AND mkb.MKB_CODE BETWEEN 'I60' AND 'I69.8'
+------
+   UNION
+------
+   -- 2. Клинические диагнозы из историй болезни
+   SELECT a.id AS patient_id
+   FROM D_HOSP_HISTORIES hh
+   JOIN D_MKB10 mkb ON mkb.id = hh.MKB_CLINIC
+   JOIN D_PERSMEDCARD pmc ON pmc.ID = hh.PATIENT
+   JOIN D_AGENTS a ON a.id = pmc.AGENT
+   WHERE hh.MKB_CLINIC_DATE BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
+     AND mkb.MKB_CODE BETWEEN 'I60' AND 'I69.8'
+) t;
