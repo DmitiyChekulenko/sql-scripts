@@ -21,18 +21,27 @@
 -- ВАЖНО: Формат даты — строго DD.MM.YYYY
 -- =============================================================================
 
-SELECT
-    l.CODE_LPU,
-    COUNT(DISTINCT hh.ID) AS hh_count
-FROM D_LPU l
-LEFT JOIN D_HOSP_HISTORIES hh ON hh.LPU = l.ID
-LEFT JOIN D_MKB10 mkb ON mkb.id = hh.MKB_CLINIC
-LEFT JOIN D_DISEASECASES dc ON dc.id = hh.DISEASECASE
-LEFT JOIN D_DIRECTION_SERVICES ds ON ds.DISEASECASE = dc.ID
-LEFT JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
-WHERE 1=1
-  AND mkb.MKB_CODE BETWEEN 'I63' AND 'I63.9'
-  AND serv.SE_CODE = 'A25.30.036.002'
-  AND hh.DATE_OUT BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
-GROUP BY l.CODE_LPU
-ORDER BY l.CODE_LPU;
+SELECT COUNT(DISTINCT t.patient_id) AS patient_count
+FROM (
+   -- 1. Диагнозы, выставленные на приёмах (визитах)
+   SELECT a.id AS patient_id
+   FROM D_VIS_DIAGNOSISES dd
+   JOIN D_MKB10 mkb ON mkb.id = dd.MKB
+   JOIN D_VISITS v ON v.ID = dd.PID
+   JOIN D_DIRECTION_SERVICES ds ON ds.id = v.PID
+   JOIN D_PERSMEDCARD pmc ON pmc.ID = ds.PATIENT
+   JOIN D_AGENTS a ON a.id = pmc.AGENT
+   WHERE v.VISIT_DATE BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
+     AND mkb.MKB_CODE BETWEEN 'I60' AND 'I69.8'
+------
+   UNION
+------
+   -- 2. Клинические диагнозы из историй болезни
+   SELECT a.id AS patient_id
+   FROM D_HOSP_HISTORIES hh
+   JOIN D_MKB10 mkb ON mkb.id = hh.MKB_CLINIC
+   JOIN D_PERSMEDCARD pmc ON pmc.ID = hh.PATIENT
+   JOIN D_AGENTS a ON a.id = pmc.AGENT
+   WHERE hh.MKB_CLINIC_DATE BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
+     AND mkb.MKB_CODE BETWEEN 'I60' AND 'I69.8'
+) t;
