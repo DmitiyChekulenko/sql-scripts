@@ -14,11 +14,13 @@
 --   4. Скрипт автоматически обернёт их в кавычки и выполнит запрос.
 --
 -- РЕШЕНИЕ ПРОБЛЕМЫ:
---   Ранее пользователи ошибались, забывая кавычки при вводе дат.
+--   Ранее пользователи ошибались, забывая кавычки при вводе дат + пользователь часто полагает что date2 означает включение случаев входящих в date2
 --   Использование синтаксиса '${date1}' в DBeaver позволяет
 --   вводить даты как простой текст, а система подставит их как строку.
---
+--   Использование конструкции  + INTERVAL '1' DAY - INTERVAL '1' SECOND означает что все случае включенные в date2 попадут в выборку
 -- ВАЖНО: Формат даты — строго DD.MM.YYYY
+
+
 -- =============================================================================
 
 SELECT
@@ -33,6 +35,6 @@ LEFT JOIN D_V_SERVICES serv ON serv.ID = ds.SERVICE
 WHERE 1=1
   AND mkb.MKB_CODE BETWEEN 'I63' AND 'I63.9'
   AND serv.SE_CODE = 'A25.30.036.002'
-  AND hh.DATE_OUT BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy')
+  AND hh.DATE_OUT BETWEEN TO_DATE('${date1}', 'dd.mm.yyyy') AND TO_DATE('${date2}', 'dd.mm.yyyy') + INTERVAL '1' DAY - INTERVAL '1' SECOND
 GROUP BY l.CODE_LPU
 ORDER BY l.CODE_LPU;
