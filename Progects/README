@@ -1,3 +1,5 @@
 Описание по проектам:
 
 ✅high_psa_analysis - скрипт с использованием 3-х CTE + hint (`/*+ MATERIALIZE */`) для оптимезации запроса
+✅psa_analysis_target_age - скрипт с использованием CTE, логика аналогична high_psa_analysis
+✅count_patients_with_stroke_diagnosis - скрипт для подсчета уникальных пациентов с нужным диагнозом как в стационаре так и в амбулатории (UNION)
